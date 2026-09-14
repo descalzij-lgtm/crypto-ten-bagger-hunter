@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Crypto Ten Bagger Hunter — Descalzi Finanzas</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
 <style>
 :root{--bg:#0a0f1c;--card:#111a2e;--card2:#16213c;--line:#22304f;--tx:#e8eefc;--muted:#8a9ac0;
 --blue:#3b82f6;--blue2:#60a5fa;--green:#10b981;--green2:#34d399;--amber:#f59e0b;--red:#ef4444;--purple:#a78bfa}
@@ -380,45 +381,174 @@ function criteriosAplicados(){
   return c;
 }
 
-/* ===================== EXCEL (CSV para Excel en castellano) =====================
-   El CSV anterior salía con comas y punto decimal: Excel en configuración regional
-   de Argentina lo metía todo en una sola columna. Ahora va con punto y coma, coma
-   decimal, encabezado con el contexto del rastreo y los números ya redondeados. */
-function exportarCSV(){
+/* ===================== EXCEL (.xlsx con formato) =====================
+   El CSV anterior se abría con los acentos rotos y sin ningún formato: un CSV
+   no puede llevar estilos ni formatos numéricos. Esto genera un .xlsx real con
+   ExcelJS: encabezados, anchos de columna, filtros, paneles congelados,
+   separadores de miles y porcentajes con un decimal. */
+const XL = {
+  navy:"FF101A2E", viol:"FF7C5CDC", blanco:"FFFFFFFF", zebra:"FFF7F9FC",
+  linea:"FFDCE3EF", gris:"FF6B7A8F", texto:"FF1E2638",
+  verde:"FF10966E", azul:"FF2F6FD8", ambar:"FFC98A0A", rojo:"FFCC323C",
+  avisoFondo:"FFFDF6E6", avisoTexto:"FF8A6A12"
+};
+const FMT_USD = '#,##0';
+const FMT_PCT = '0.0%';
+const FMT_PCT2 = '0.00%';
+const FMT_MULT = '#,##0.0"x"';
+const FMT_PRECIO = '[>=1]#,##0.00;0.000000';
+
+async function exportarCSV(){           // el botón sigue llamándose así
   if(!hayResultados()) return;
-  const n = (v,d=2)=> (v===null||v===undefined||isNaN(v)) ? "" : String(Number(v).toFixed(d)).replace(".",",");
-  const ent = v => (v===null||v===undefined||isNaN(v)) ? "" : String(Math.round(v));
-  const txt = v => `"${String(v===null||v===undefined?"":v).replace(/"/g,'""')}"`;
+  if(!window.ExcelJS){ const e=document.getElementById("err"); e.textContent="No se pudo cargar el generador de Excel. Revisá tu conexión y recargá la página."; e.style.display="block"; return; }
 
-  const cab = ["#","Activo","Símbolo","Categoría","Tipo","Puntaje",
-    "Comisiones 12m (USD)","Revenue 12m (USD)","A holders 12m (USD)","Take rate (%)",
-    "TVL (USD)","Market cap (USD)","FDV (USD)","P/Comisiones (x)","P/Revenue (x)",
-    "Yield al holder (%)","Dilución pendiente (%)","Crecimiento (%)","Cuota de categoría (%)",
-    "Cadenas","Precio (USD)"];
+  const wb = new ExcelJS.Workbook();
+  wb.creator = "Crypto Ten Bagger Hunter · Descalzi Finanzas";
+  wb.created = new Date();
 
-  const filas = RESULT.map((a,i)=>[
-    i+1, txt(a.name), txt(a.symbol||""), txt(a.category||""), txt(a.tipo), a.score,
-    ent(a.fees1y), ent(a.rev1y), ent(a.hold1y), n(a.takeRate*100,1),
-    ent(a.tvl), ent(a.mcap), ent(a.fdv), n(a.pf,2), n(a.ps,2),
-    n(a.holdersYield*100,2), n(a.dilucion*100,1), n(a.growthImplied*100,1), n(a.cuotaCategoria*100,1),
-    a.nChains||"", n(a.price, a.price>=100?2:6)
-  ].join(";"));
+  /* ---------- Hoja 1: Ranking ---------- */
+  const ws = wb.addWorksheet("Ranking", {
+    views:[{state:"frozen", ySplit:8}],
+    pageSetup:{paperSize:9, orientation:"landscape", fitToPage:true, fitToWidth:1, fitToHeight:0}
+  });
 
-  const enc = [
-    "sep=;",
-    txt("CRYPTO TEN BAGGER HUNTER · DESCALZI FINANZAS"),
-    txt(`Ranking: ${nombreModo()}`),
-    txt(`Generado el ${new Date().toLocaleString("es-AR")}`),
-    txt(`${RESULT.length} activos · datos de DefiLlama y CoinGecko al ${new Date(UNIVERSO.fetchedAt).toLocaleString("es-AR")}`),
-    txt("Criterios: " + (criteriosAplicados().join(" · ") || "sin filtros")),
-    "",
-    txt("Análisis educativo. No es recomendación de inversión. Los criptoactivos son de altísimo riesgo."),
-    ""
+  const COLS = [
+    {h:"#",                     w:5,  fmt:"0",        al:"center"},
+    {h:"Activo",                w:22, fmt:null,       al:"left"},
+    {h:"Símbolo",               w:10, fmt:null,       al:"left"},
+    {h:"Categoría",             w:18, fmt:null,       al:"left"},
+    {h:"Tipo",                  w:11, fmt:null,       al:"left"},
+    {h:"Puntaje",               w:9,  fmt:"0",        al:"center"},
+    {h:"Comisiones 12m",        w:17, fmt:FMT_USD,    al:"right"},
+    {h:"Revenue 12m",           w:16, fmt:FMT_USD,    al:"right"},
+    {h:"A holders 12m",         w:16, fmt:FMT_USD,    al:"right"},
+    {h:"Take rate",             w:11, fmt:FMT_PCT,    al:"right"},
+    {h:"TVL",                   w:16, fmt:FMT_USD,    al:"right"},
+    {h:"Market cap",            w:16, fmt:FMT_USD,    al:"right"},
+    {h:"FDV",                   w:16, fmt:FMT_USD,    al:"right"},
+    {h:"P/Comisiones",          w:13, fmt:FMT_MULT,   al:"right"},
+    {h:"P/Revenue",             w:12, fmt:FMT_MULT,   al:"right"},
+    {h:"Yield al holder",       w:13, fmt:FMT_PCT2,   al:"right"},
+    {h:"Dilución pendiente",    w:16, fmt:FMT_PCT,    al:"right"},
+    {h:"Crecimiento",           w:13, fmt:FMT_PCT,    al:"right"},
+    {h:"Cuota de categoría",    w:16, fmt:FMT_PCT,    al:"right"},
+    {h:"Cadenas",               w:9,  fmt:"0",        al:"center"},
+    {h:"Precio USD",            w:13, fmt:FMT_PRECIO, al:"right"}
   ];
+  ws.columns = COLS.map(c=>({width:c.width||c.w}));
+  const N = COLS.length, ULT = ws.getColumn(N).letter;
 
-  const csv = [...enc, cab.map(txt).join(";"), ...filas].join("\r\n");
-  bajar(new Blob(["﻿"+csv],{type:"text/csv;charset=utf-8"}),
-    `ranking-cripto-${modoActivo}-${fechaArchivo()}.csv`);
+  const relleno = argb => ({type:"pattern", pattern:"solid", fgColor:{argb}});
+  function banda(fila, texto, o){
+    o = o||{};
+    ws.mergeCells(`A${fila}:${ULT}${fila}`);
+    const cel = ws.getCell(`A${fila}`);
+    cel.value = texto;
+    cel.font = {name:"Calibri", size:o.size||10, bold:!!o.bold, color:{argb:o.color||XL.blanco}};
+    cel.fill = relleno(o.fondo || XL.navy);
+    cel.alignment = {vertical:"middle", horizontal:"left", indent:1};
+    ws.getRow(fila).height = o.alto || 18;
+  }
+
+  /* Encabezado del documento */
+  banda(1, "RANKING DE PROTOCOLOS CRIPTO", {size:15, bold:true, alto:30});
+  banda(2, `Criterio: ${nombreModo()}  ·  ${RESULT.length} activos seleccionados sobre ${UNIVERSO.activos.length} analizados`,
+    {size:10.5, color:"FFB9A8F2"});
+  banda(3, `Generado el ${new Date().toLocaleString("es-AR")}  ·  Datos de DefiLlama y CoinGecko al ${new Date(UNIVERSO.fetchedAt).toLocaleString("es-AR")}`,
+    {size:9, color:"FF9AA8C4"});
+  banda(4, "Criterios aplicados: " + (criteriosAplicados().join("  ·  ") || "sin filtros"),
+    {size:9, color:"FF9AA8C4", alto:20});
+  banda(5, "CRYPTO TEN BAGGER HUNTER · DESCALZI FINANZAS", {size:8, bold:true, color:"FF7C8BAE"});
+  banda(6, "Análisis educativo. No constituye recomendación de inversión ni asesoramiento financiero. Los criptoactivos son de altísimo riesgo: podés perder todo el capital.",
+    {size:9, fondo:XL.avisoFondo, color:XL.avisoTexto, alto:20});
+  ws.getRow(7).height = 6;
+
+  /* Encabezado de la tabla */
+  const cab = ws.getRow(8);
+  COLS.forEach((c,i)=>{
+    const cel = cab.getCell(i+1);
+    cel.value = c.h;
+    cel.font = {name:"Calibri", size:9.5, bold:true, color:{argb:XL.blanco}};
+    cel.fill = relleno(XL.navy);
+    cel.alignment = {vertical:"middle", horizontal:c.al==="left"?"left":"center", wrapText:true};
+    cel.border = {bottom:{style:"medium", color:{argb:XL.viol}}};
+  });
+  cab.height = 30;
+
+  /* Filas */
+  RESULT.forEach((a,i)=>{
+    const fila = ws.addRow([
+      i+1, a.name, a.symbol||"", a.category||"", a.tipo, a.score,
+      a.fees1y||null, a.rev1y||null, a.hold1y||null, a.takeRate,
+      a.tvl, a.mcap, a.fdv, a.pf, a.ps,
+      a.holdersYield, a.dilucion, a.growthImplied, a.cuotaCategoria,
+      a.nChains||null, a.price
+    ]);
+    fila.height = 17;
+    const par = i % 2 === 1;
+    COLS.forEach((c,k)=>{
+      const cel = fila.getCell(k+1);
+      if(c.fmt) cel.numFmt = c.fmt;
+      cel.font = {name:"Calibri", size:10, color:{argb:XL.texto}};
+      cel.alignment = {vertical:"middle", horizontal:c.al, indent:c.al==="left"?1:0};
+      if(par) cel.fill = relleno(XL.zebra);
+      cel.border = {bottom:{style:"thin", color:{argb:XL.linea}}};
+    });
+    /* Nombre en negrita y puntaje coloreado, que es lo que se busca de un vistazo */
+    fila.getCell(2).font = {name:"Calibri", size:10, bold:true, color:{argb:XL.navy}};
+    const cp = fila.getCell(6);
+    const colPts = a.score>=75?XL.verde : a.score>=60?XL.azul : a.score>=45?XL.ambar : XL.rojo;
+    cp.font = {name:"Calibri", size:10.5, bold:true, color:{argb:XL.blanco}};
+    cp.fill = relleno(colPts);
+    /* Dilución: verde si es baja, rojo si la emisión pendiente supera la capitalización */
+    if(a.dilucion!==null && a.dilucion!==undefined){
+      fila.getCell(17).font = {name:"Calibri", size:10, bold:a.dilucion>1,
+        color:{argb: a.dilucion<0.25?XL.verde : a.dilucion<1?XL.ambar : XL.rojo}};
+    }
+    if(a.growthImplied!==null && a.growthImplied!==undefined){
+      fila.getCell(18).font = {name:"Calibri", size:10, color:{argb:a.growthImplied>=0?XL.verde:XL.rojo}};
+    }
+  });
+
+  ws.autoFilter = {from:{row:8, column:1}, to:{row:8+RESULT.length, column:N}};
+
+  /* ---------- Hoja 2: Metodología ---------- */
+  const wm = wb.addWorksheet("Metodología");
+  wm.columns = [{width:22},{width:110}];
+  const tituloM = wm.addRow(["CÓMO LEER ESTE RANKING",""]);
+  tituloM.getCell(1).font = {name:"Calibri", size:13, bold:true, color:{argb:XL.blanco}};
+  tituloM.getCell(1).fill = relleno(XL.navy);
+  tituloM.getCell(2).fill = relleno(XL.navy);
+  tituloM.height = 26;
+  wm.addRow([]);
+  [
+    ["Puntaje","Promedio ponderado de seis categorías: tracción 25%, rentabilidad 20%, crecimiento 15%, tokenomics 15%, valuación 15% y riesgo 10%. Mide la calidad del negocio, no el retorno esperado: un protocolo excelente y caro puntúa alto y proyecta poco."],
+    ["Comisiones 12m","Lo que los usuarios pagaron por usar el protocolo en los últimos doce meses. Es el equivalente a los ingresos de una empresa."],
+    ["Revenue 12m","Cuánto de esas comisiones retuvo el protocolo. El resto se lo llevan quienes aportan capital o liquidez."],
+    ["A holders 12m","La parte del revenue que efectivamente llega a quienes tienen el token. Si es cero, el token no captura el valor que genera el negocio."],
+    ["Take rate","Revenue sobre comisiones. Por debajo de 10%, el negocio se lo llevan los proveedores de liquidez, no el protocolo."],
+    ["TVL","Capital depositado en el protocolo."],
+    ["Market cap y FDV","Capitalización con los tokens en circulación, y con todos los tokens que llegarán a existir."],
+    ["P/Comisiones","Capitalización sobre comisiones anuales. Es el equivalente cripto del P/E. Conviene compararlo contra la mediana de su misma categoría, no en términos absolutos."],
+    ["Yield al holder","Lo que el protocolo reparte a los holders, medido sobre la capitalización. El dividendo del token."],
+    ["Dilución pendiente","Tokens que faltan emitir, medidos contra la capitalización actual. Un 300% significa que la oferta futura puede cuadruplicar la actual. Es el riesgo más subestimado en cripto."],
+    ["Crecimiento","Ritmo de comisiones del último mes contra el promedio del año. Detecta aceleraciones y frenadas."],
+    ["Cuota de categoría","Qué porción de las comisiones de su categoría capta este protocolo. Es el proxy de foso competitivo."],
+    ["Fuentes","Comisiones, revenue y TVL de DefiLlama. Precio, capitalización y supply de CoinGecko."],
+    ["Límite del modelo","Mide generación de caja, no legitimidad ni durabilidad. Revisá siempre qué hace cada protocolo antes de tomar una decisión."]
+  ].forEach((g,i)=>{
+    const f = wm.addRow(g);
+    f.getCell(1).font = {name:"Calibri", size:10, bold:true, color:{argb:XL.navy}};
+    f.getCell(1).alignment = {vertical:"top", horizontal:"left", indent:1};
+    f.getCell(2).font = {name:"Calibri", size:10, color:{argb:XL.texto}};
+    f.getCell(2).alignment = {vertical:"top", wrapText:true, indent:1};
+    if(i%2) { f.getCell(1).fill = relleno(XL.zebra); f.getCell(2).fill = relleno(XL.zebra); }
+    f.height = 30;
+  });
+
+  const buf = await wb.xlsx.writeBuffer();
+  bajar(new Blob([buf], {type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}),
+    `ranking-cripto-${modoActivo}-${fechaArchivo()}.xlsx`);
 }
 
 /* ===================== INFORME EN PDF =====================
