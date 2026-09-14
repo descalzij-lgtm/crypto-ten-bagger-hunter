@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Crypto Ten Bagger Hunter — Descalzi Finanzas</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
 :root{--bg:#0a0f1c;--card:#111a2e;--card2:#16213c;--line:#22304f;--tx:#e8eefc;--muted:#8a9ac0;
 --blue:#3b82f6;--blue2:#60a5fa;--green:#10b981;--green2:#34d399;--amber:#f59e0b;--red:#ef4444;--purple:#a78bfa}
@@ -101,7 +102,9 @@ footer{text-align:center;color:var(--muted);font-size:12px;margin-top:30px;paddi
   <div class="acciones">
     <button class="btn" onclick="rastrear()">Rastrear</button>
     <button class="btn ghost" onclick="reset()">Limpiar filtros</button>
-    <button class="btn ghost" onclick="exportarCSV()">Descargar CSV</button>
+    <button class="btn ghost" onclick="exportarCSV()">Descargar Excel</button>
+    <button class="btn ghost" onclick="generarPDFRanking()">Informe PDF</button>
+    <button class="btn ghost" onclick="generarPlacaRanking()">Placa para redes</button>
     <span class="foot" id="estado" style="margin:0"></span>
   </div>
 </div>
@@ -347,16 +350,319 @@ function ordenar(col){
   });
   document.querySelector("#tabla tbody").innerHTML=filas();
 }
+/* ===================== UTILIDADES DE EXPORTACIÓN ===================== */
+function hayResultados(){
+  if(RESULT.length) return true;
+  const e=document.getElementById("err"); e.textContent="Primero corré un rastreo."; e.style.display="block";
+  return false;
+}
+function bajar(blob, nombre){
+  const u=URL.createObjectURL(blob), el=document.createElement("a");
+  el.href=u; el.download=nombre; el.click();
+  setTimeout(()=>URL.revokeObjectURL(u),2000);
+}
+function nombreModo(){ return (MODOS.find(m=>m.id===modoActivo)||{}).n || "Personalizado"; }
+function fechaArchivo(){ return new Date().toISOString().slice(0,10); }
+
+/* Descripción de los criterios aplicados, para que un informe se explique solo */
+function criteriosAplicados(){
+  const f=leerFiltros(), c=[];
+  if(f.tipo) c.push(`Tipo: ${f.tipo==="cadena"?"cadenas (L1/L2)":"protocolos"}`);
+  if(f.cat) c.push(`Categoría: ${f.cat}`);
+  if(f.fees!==null) c.push(`Comisiones 12m desde ${usd(f.fees)}`);
+  if(f.mcMin!==null||f.mcMax!==null) c.push(`Market cap entre ${usd(f.mcMin)} y ${usd(f.mcMax)}`);
+  if(f.take>0) c.push(`Take rate mínimo ${pct(f.take)}`);
+  if(f.crec>-1) c.push(`Crecimiento mínimo ${pct(f.crec)}`);
+  if(f.dilu!==null) c.push(`Dilución máxima ${pct(f.dilu)}`);
+  if(f.pf>0) c.push(`P/Comisiones máximo ${mult(f.pf)}`);
+  if(f.yld>0) c.push(`Yield mínimo ${pct(f.yld)}`);
+  if(f.token) c.push("Solo activos con token listado");
+  return c;
+}
+
+/* ===================== EXCEL (CSV para Excel en castellano) =====================
+   El CSV anterior salía con comas y punto decimal: Excel en configuración regional
+   de Argentina lo metía todo en una sola columna. Ahora va con punto y coma, coma
+   decimal, encabezado con el contexto del rastreo y los números ya redondeados. */
 function exportarCSV(){
-  if(!RESULT.length){ const e=document.getElementById("err"); e.textContent="Primero corré un rastreo."; e.style.display="block"; return; }
-  const cols=["name","symbol","category","tipo","score","fees1y","rev1y","hold1y","takeRate","tvl","mcap","fdv","pf","ps","holdersYield","dilucion","growthImplied","nChains"];
-  const cab=["Activo","Símbolo","Categoría","Tipo","Puntaje","Fees 12m","Revenue 12m","A holders","Take rate","TVL","Market cap","FDV","P/Fees","P/Revenue","Yield","Dilución","Crecimiento","Cadenas"];
-  const filas=RESULT.map(a=>cols.map(c=>{const v=a[c]; return v===null||v===undefined?"":(typeof v==="string"?`"${v.replace(/"/g,'""')}"`:v);}).join(","));
-  const csv=[cab.join(","),...filas].join("\n");
-  const b=new Blob(["﻿"+csv],{type:"text/csv;charset=utf-8"});
-  const u=URL.createObjectURL(b), a=document.createElement("a");
-  a.href=u; a.download=`crypto-hunter-${new Date().toISOString().slice(0,10)}.csv`; a.click();
-  setTimeout(()=>URL.revokeObjectURL(u),1500);
+  if(!hayResultados()) return;
+  const n = (v,d=2)=> (v===null||v===undefined||isNaN(v)) ? "" : String(Number(v).toFixed(d)).replace(".",",");
+  const ent = v => (v===null||v===undefined||isNaN(v)) ? "" : String(Math.round(v));
+  const txt = v => `"${String(v===null||v===undefined?"":v).replace(/"/g,'""')}"`;
+
+  const cab = ["#","Activo","Símbolo","Categoría","Tipo","Puntaje",
+    "Comisiones 12m (USD)","Revenue 12m (USD)","A holders 12m (USD)","Take rate (%)",
+    "TVL (USD)","Market cap (USD)","FDV (USD)","P/Comisiones (x)","P/Revenue (x)",
+    "Yield al holder (%)","Dilución pendiente (%)","Crecimiento (%)","Cuota de categoría (%)",
+    "Cadenas","Precio (USD)"];
+
+  const filas = RESULT.map((a,i)=>[
+    i+1, txt(a.name), txt(a.symbol||""), txt(a.category||""), txt(a.tipo), a.score,
+    ent(a.fees1y), ent(a.rev1y), ent(a.hold1y), n(a.takeRate*100,1),
+    ent(a.tvl), ent(a.mcap), ent(a.fdv), n(a.pf,2), n(a.ps,2),
+    n(a.holdersYield*100,2), n(a.dilucion*100,1), n(a.growthImplied*100,1), n(a.cuotaCategoria*100,1),
+    a.nChains||"", n(a.price, a.price>=100?2:6)
+  ].join(";"));
+
+  const enc = [
+    "sep=;",
+    txt("CRYPTO TEN BAGGER HUNTER · DESCALZI FINANZAS"),
+    txt(`Ranking: ${nombreModo()}`),
+    txt(`Generado el ${new Date().toLocaleString("es-AR")}`),
+    txt(`${RESULT.length} activos · datos de DefiLlama y CoinGecko al ${new Date(UNIVERSO.fetchedAt).toLocaleString("es-AR")}`),
+    txt("Criterios: " + (criteriosAplicados().join(" · ") || "sin filtros")),
+    "",
+    txt("Análisis educativo. No es recomendación de inversión. Los criptoactivos son de altísimo riesgo."),
+    ""
+  ];
+
+  const csv = [...enc, cab.map(txt).join(";"), ...filas].join("\r\n");
+  bajar(new Blob(["﻿"+csv],{type:"text/csv;charset=utf-8"}),
+    `ranking-cripto-${modoActivo}-${fechaArchivo()}.csv`);
+}
+
+/* ===================== INFORME EN PDF =====================
+   Apaisado, porque es una tabla de once columnas. El encabezado de la tabla se
+   vuelve a dibujar en cada página nueva, así ninguna hoja queda con números
+   sueltos sin saber a qué columna corresponden. */
+function generarPDFRanking(){
+  if(!hayResultados()) return;
+  if(!window.jspdf){ const e=document.getElementById("err"); e.textContent="No se pudo cargar el generador de PDF. Revisá tu conexión y recargá la página."; e.style.display="block"; return; }
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({unit:"pt", format:"a4", orientation:"landscape"});
+  const W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight();
+  const M = 38, ANCHO = W - M*2, PIE = 44;
+  const NAVY=[16,26,46], VIOL=[124,92,220], GRIS=[122,134,158], TX=[30,38,56],
+        VERDE=[16,150,110], AMBAR=[201,138,10], ROJO=[204,50,60], LINEA=[224,229,238];
+  let y = M, pag = 1;
+
+  function pie(){
+    doc.setDrawColor(...LINEA); doc.setLineWidth(.5); doc.line(M, H-30, W-M, H-30);
+    doc.setFont("helvetica","normal"); doc.setFontSize(7.5); doc.setTextColor(...GRIS);
+    doc.text("Crypto Ten Bagger Hunter · Descalzi Finanzas · Análisis educativo, no constituye recomendación de inversión", M, H-18);
+    doc.text(String(pag), W-M, H-18, {align:"right"});
+  }
+  function nuevaPag(){ pie(); doc.addPage(); pag++; y = M; }
+  function pedir(alto){ if(y + alto > H - PIE){ nuevaPag(); return true; } return false; }
+  function titulo(t){
+    pedir(40);
+    doc.setFillColor(...VIOL); doc.rect(M, y, 3, 12, "F");
+    doc.setFont("helvetica","bold"); doc.setFontSize(10.5); doc.setTextColor(...NAVY);
+    doc.text(t.toUpperCase(), M+10, y+10); y += 22;
+  }
+  function parrafo(t, o){
+    o=o||{}; const size=o.size||8.5, alto=size*1.42;
+    doc.setFont("helvetica", o.bold?"bold":"normal"); doc.setFontSize(size);
+    doc.setTextColor(...(o.color||TX));
+    doc.splitTextToSize(t, o.ancho||ANCHO).forEach(l=>{ pedir(alto); doc.text(l, M, y+size*0.9); y += alto; });
+    y += o.gap===undefined?6:o.gap;
+  }
+
+  /* Columnas del ranking */
+  const COLS = [
+    {t:"#",              w:22,  a:"right"},
+    {t:"Activo",         w:108, a:"left"},
+    {t:"Categoría",      w:80,  a:"left"},
+    {t:"Pts",            w:28,  a:"right"},
+    {t:"Comisiones 12m", w:78,  a:"right"},
+    {t:"Revenue 12m",    w:74,  a:"right"},
+    {t:"Take",           w:40,  a:"right"},
+    {t:"Market cap",     w:74,  a:"right"},
+    {t:"P/Com.",         w:42,  a:"right"},
+    {t:"Yield",          w:42,  a:"right"},
+    {t:"Dilución",       w:50,  a:"right"},
+    {t:"Crec.",          w:46,  a:"right"}
+  ];
+  const ANCHO_TABLA = COLS.reduce((s,c)=>s+c.w,0);
+
+  function encabezadoTabla(){
+    doc.setFillColor(...NAVY); doc.rect(M, y, ANCHO_TABLA, 20, "F");
+    doc.setFont("helvetica","bold"); doc.setFontSize(7.5); doc.setTextColor(255,255,255);
+    let x = M;
+    COLS.forEach(c=>{
+      doc.text(c.t, c.a==="right" ? x+c.w-5 : x+5, y+13, {align:c.a==="right"?"right":"left"});
+      x += c.w;
+    });
+    y += 20;
+  }
+  function filaRanking(a, i){
+    const alto = 22;
+    if(pedir(alto+6)) encabezadoTabla();          // si cambió de página, repite el encabezado
+    if(i%2) { doc.setFillColor(247,249,252); doc.rect(M, y, ANCHO_TABLA, alto, "F"); }
+    const colPts = a.score>=75?VERDE:a.score>=60?[47,111,216]:a.score>=45?AMBAR:ROJO;
+    const vals = [
+      [String(i+1), GRIS, false],
+      [String(a.name).slice(0,20), NAVY, true],
+      [String(a.category||"—").slice(0,16), GRIS, false],
+      [String(a.score), colPts, true],
+      [usd(a.fees1y), TX, false],
+      [usd(a.rev1y), TX, false],
+      [pct(a.takeRate), TX, false],
+      [usd(a.mcap), TX, false],
+      [mult(a.pf), TX, false],
+      [pct(a.holdersYield,2), TX, false],
+      [pct(a.dilucion), a.dilucion===null?TX:(a.dilucion<0.25?VERDE:a.dilucion<1?AMBAR:ROJO), false],
+      [a.growthImplied!==null?(a.growthImplied>=0?"+":"")+pct(a.growthImplied):"N/D",
+        a.growthImplied===null?TX:(a.growthImplied>=0?VERDE:ROJO), false]
+    ];
+    let x = M;
+    vals.forEach((v,k)=>{
+      const c = COLS[k];
+      doc.setFont("helvetica", v[2]?"bold":"normal"); doc.setFontSize(7.6); doc.setTextColor(...v[1]);
+      doc.text(v[0], c.a==="right" ? x+c.w-5 : x+5, y+10, {align:c.a==="right"?"right":"left", maxWidth:c.w-8});
+      x += c.w;
+    });
+    /* Segunda línea: símbolo y tipo, en chiquito */
+    doc.setFont("helvetica","normal"); doc.setFontSize(6.5); doc.setTextColor(...GRIS);
+    doc.text(`${a.symbol||"sin token"} · ${a.tipo}`, M+COLS[0].w+5, y+18, {maxWidth:COLS[1].w-8});
+    doc.setDrawColor(...LINEA); doc.setLineWidth(.4); doc.line(M, y+alto, M+ANCHO_TABLA, y+alto);
+    y += alto;
+  }
+
+  /* ---------- Portada ---------- */
+  doc.setFillColor(...NAVY); doc.rect(0, 0, W, 86, "F");
+  doc.setFont("helvetica","bold"); doc.setFontSize(18); doc.setTextColor(255,255,255);
+  doc.text("Ranking de protocolos cripto", M, 40);
+  doc.setFont("helvetica","normal"); doc.setFontSize(10); doc.setTextColor(178,164,240);
+  doc.text(`Criterio: ${nombreModo()}`, M, 60);
+  doc.setFontSize(8); doc.setTextColor(150,162,196);
+  doc.text("CRYPTO TEN BAGGER HUNTER · DESCALZI FINANZAS", M, 76);
+  doc.setFontSize(8.5); doc.setTextColor(200,210,230);
+  doc.text(new Date().toLocaleDateString("es-AR",{day:"2-digit",month:"long",year:"numeric"}), W-M, 40, {align:"right"});
+  doc.setFontSize(7.5); doc.setTextColor(150,162,196);
+  doc.text(`Datos al ${new Date(UNIVERSO.fetchedAt).toLocaleString("es-AR")}`, W-M, 58, {align:"right"});
+  y = 104;
+
+  /* ---------- Resumen ---------- */
+  const medPF = (()=>{const s=RESULT.map(x=>x.pf).filter(v=>v>0).sort((a,b)=>a-b); return s.length?s[Math.floor(s.length/2)]:null;})();
+  const resumen = [
+    ["Activos seleccionados", String(RESULT.length)],
+    ["Puntaje promedio", nf(RESULT.reduce((s,x)=>s+x.score,0)/RESULT.length,0)],
+    ["Comisiones 12m sumadas", usd(RESULT.reduce((s,x)=>s+(x.fees1y||0),0))],
+    ["P/Comisiones mediana", mult(medPF)],
+    ["Universo analizado", `${UNIVERSO.activos.length} activos`]
+  ];
+  const wKPI = ANCHO/5;
+  resumen.forEach((r,i)=>{
+    const x = M + i*wKPI;
+    doc.setFillColor(246,248,252); doc.rect(x+2, y, wKPI-4, 44, "F");
+    doc.setFillColor(...VIOL); doc.rect(x+2, y, 3, 44, "F");
+    doc.setFont("helvetica","normal"); doc.setFontSize(7); doc.setTextColor(...GRIS);
+    doc.text(r[0].toUpperCase(), x+12, y+16);
+    doc.setFont("helvetica","bold"); doc.setFontSize(12); doc.setTextColor(...NAVY);
+    doc.text(String(r[1]), x+12, y+34, {maxWidth:wKPI-18});
+  });
+  y += 60;
+
+  /* ---------- Criterios ---------- */
+  titulo("Criterios de selección");
+  parrafo(criteriosAplicados().join("  ·  ") || "Sin filtros: se muestran todos los activos del universo.", {size:8.5, color:GRIS, gap:12});
+
+  /* ---------- Ranking ---------- */
+  titulo("Ranking");
+  encabezadoTabla();
+  RESULT.forEach((a,i)=>filaRanking(a,i));
+  y += 16;
+
+  /* ---------- Glosario ---------- */
+  titulo("Cómo leer este ranking");
+  [
+    ["Puntaje","Promedio ponderado de seis categorías: tracción 25%, rentabilidad 20%, crecimiento 15%, tokenomics 15%, valuación 15% y riesgo 10%. Mide la calidad del negocio, no el retorno esperado."],
+    ["Comisiones y Revenue","Lo que los usuarios pagaron por usar el protocolo en los últimos doce meses, y cuánto de eso retuvo el protocolo. El resto se lo llevan quienes aportan capital o liquidez."],
+    ["Take rate","Qué porcentaje de las comisiones retiene el protocolo. Por debajo de 10%, el negocio se lo llevan los proveedores de liquidez."],
+    ["P/Comisiones","Capitalización sobre comisiones anuales. Es el equivalente cripto del P/E. Conviene compararlo contra la mediana de la misma categoría, no en términos absolutos."],
+    ["Yield al holder","Lo que el protocolo reparte a quienes tienen el token, medido sobre la capitalización. Si es cero, el token no captura el valor que genera el negocio."],
+    ["Dilución","Tokens pendientes de emitir, medidos contra la capitalización actual. Un 300% significa que la oferta futura puede cuadruplicar la actual."],
+    ["Crecimiento","Ritmo de comisiones del último mes contra el promedio del año. Detecta aceleraciones y frenadas."]
+  ].forEach(g=>{
+    pedir(24);
+    doc.setFont("helvetica","bold"); doc.setFontSize(8); doc.setTextColor(...NAVY);
+    doc.text(g[0], M, y+8);
+    doc.setFont("helvetica","normal"); doc.setTextColor(...GRIS);
+    doc.splitTextToSize(g[1], ANCHO-92).forEach((l,i)=>{ if(i>0) pedir(10); doc.text(l, M+92, y+8+i*10); if(i>0) y+=10; });
+    y += 18;
+  });
+
+  /* ---------- Cierre ---------- */
+  y += 6; pedir(58);
+  doc.setFillColor(253,246,230); doc.rect(M, y, ANCHO, 44, "F");
+  doc.setFont("helvetica","normal"); doc.setFontSize(7.5); doc.setTextColor(150,110,20);
+  doc.splitTextToSize("Aviso profesional. Este informe tiene fines educativos e informativos. No constituye recomendación de inversión, asesoramiento financiero personalizado ni oferta de compra o venta de activos. Los criptoactivos son de altísimo riesgo: podés perder todo el capital invertido. Un puntaje alto no implica retornos positivos. El modelo mide generación de caja, no la legitimidad ni la durabilidad del proyecto: revisá siempre qué hace cada protocolo antes de tomar una decisión. Fuentes: DefiLlama y CoinGecko.", ANCHO-16)
+    .forEach((l,i)=>doc.text(l, M+8, y+13+i*9));
+  pie();
+
+  doc.save(`informe-ranking-cripto-${modoActivo}-${fechaArchivo()}.pdf`);
+}
+
+/* ===================== PLACA PARA REDES ===================== */
+function generarPlacaRanking(){
+  if(!hayResultados()) return;
+  const W=1080, H=1350;
+  const cv=document.createElement("canvas"); cv.width=W; cv.height=H;
+  const c=cv.getContext("2d");
+  const g=c.createLinearGradient(0,0,W,H);
+  g.addColorStop(0,"#0a0f1c"); g.addColorStop(.55,"#131a33"); g.addColorStop(1,"#1a1636");
+  c.fillStyle=g; c.fillRect(0,0,W,H);
+  c.fillStyle="#a78bfa"; c.fillRect(0,0,W,9);
+  const F=(s,w)=>`${w||400} ${s}px -apple-system, "Segoe UI", Roboto, sans-serif`;
+  function corta(txt,size,peso,maxAncho,x,yy,alto,color,maxLineas){
+    c.font=F(size,peso); c.fillStyle=color;
+    const pal=String(txt).split(" "); let ln="", n=0;
+    for(const p of pal){ const t=ln?ln+" "+p:p;
+      if(c.measureText(t).width>maxAncho && ln){ c.fillText(ln,x,yy+n*alto); ln=p; n++;
+        if(maxLineas && n>=maxLineas){ ln=ln.slice(0,30)+"…"; break; } } else ln=t; }
+    c.fillText(ln,x,yy+n*alto); return yy+(n+1)*alto;
+  }
+
+  c.textAlign="left";
+  c.font=F(24,700); c.fillStyle="#a78bfa"; c.fillText("CRYPTO TEN BAGGER HUNTER", 80, 110);
+  c.font=F(20,400); c.fillStyle="#8a9ac0"; c.fillText("Descalzi Finanzas · Protocolos con ingresos reales", 80, 145);
+
+  c.font=F(62,800); c.fillStyle="#e8eefc"; c.fillText("Top protocolos", 80, 235);
+  c.font=F(34,600); c.fillStyle="#a78bfa"; c.fillText(nombreModo(), 80, 288);
+
+  c.strokeStyle="rgba(255,255,255,.10)"; c.lineWidth=2;
+  c.beginPath(); c.moveTo(80,330); c.lineTo(1000,330); c.stroke();
+
+  /* Top 5 */
+  const top = RESULT.slice(0,5);
+  top.forEach((a,i)=>{
+    const yy = 380 + i*126;
+    c.fillStyle="rgba(255,255,255,.04)"; c.fillRect(80, yy, 920, 108);
+    const col = a.score>=75?"#34d399":a.score>=60?"#60a5fa":a.score>=45?"#f59e0b":"#f87171";
+    c.fillStyle=col; c.fillRect(80, yy, 5, 108);
+    c.font=F(34,800); c.fillStyle="#3d4a6b"; c.fillText(String(i+1), 110, yy+68);
+    c.font=F(38,700); c.fillStyle="#e8eefc";
+    c.fillText(String(a.name).length>18?String(a.name).slice(0,17)+"…":String(a.name), 168, yy+48);
+    c.font=F(21,400); c.fillStyle="#8a9ac0";
+    c.fillText(`${a.symbol||"sin token"} · ${String(a.category||"—").slice(0,22)}`, 168, yy+82);
+    /* Puntaje a la derecha */
+    c.textAlign="right";
+    c.font=F(46,800); c.fillStyle=col; c.fillText(String(a.score), 968, yy+52);
+    c.font=F(16,600); c.fillStyle="#8a9ac0"; c.fillText("PUNTAJE", 968, yy+76);
+    c.textAlign="left";
+    /* Dos métricas en el medio */
+    c.font=F(17,600); c.fillStyle="#6b7a9c";
+    c.fillText(`Comisiones ${usd(a.fees1y)}`, 560, yy+48);
+    c.fillText(`Take ${pct(a.takeRate)} · P/Com. ${mult(a.pf)}`, 560, yy+82);
+  });
+
+  /* Franja de contexto: qué filtro produjo este ranking */
+  const yb = 380 + top.length*126 + 14;
+  c.fillStyle="rgba(167,139,250,.10)"; c.fillRect(80, yb, 920, 112);
+  c.fillStyle="#a78bfa"; c.fillRect(80, yb, 5, 112);
+  c.font=F(20,700); c.fillStyle="#a78bfa"; c.fillText("EL FILTRO", 112, yb+34);
+  corta(criteriosAplicados().slice(0,2).join(" · ") || "Sin filtros", 20, 500, 850, 112, yb+66, 28, "#c9d4ea", 2);
+
+  /* Pie */
+  c.strokeStyle="rgba(255,255,255,.10)"; c.lineWidth=2;
+  c.beginPath(); c.moveTo(80,1188); c.lineTo(1000,1188); c.stroke();
+  c.font=F(19,400); c.fillStyle="#8a9ac0";
+  c.fillText(`${RESULT.length} candidatas sobre ${UNIVERSO.activos.length} activos · DefiLlama y CoinGecko · ${new Date().toLocaleDateString("es-AR")}`, 80, 1232);
+  corta("Análisis educativo. No es recomendación de inversión. Los criptoactivos son de altísimo riesgo: podés perder todo el capital.",
+    17, 400, 920, 80, 1268, 24, "#6b7a9c", 2);
+
+  cv.toBlob(b=>bajar(b, `top-cripto-${modoActivo}-${fechaArchivo()}.png`), "image/png");
 }
 
 pintarModos();
