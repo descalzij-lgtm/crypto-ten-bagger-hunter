@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Crypto Ten Bagger Hunter — Descalzi Finanzas</title>
+<style>
+:root{--bg:#0a0f1c;--card:#111a2e;--card2:#16213c;--line:#22304f;--tx:#e8eefc;--muted:#8a9ac0;
+--blue:#3b82f6;--blue2:#60a5fa;--green:#10b981;--green2:#34d399;--amber:#f59e0b;--red:#ef4444;--purple:#a78bfa}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+.wrap{max-width:1320px;margin:0 auto;padding:22px 18px 60px}
+header{display:flex;align-items:center;gap:14px;padding-bottom:16px;border-bottom:1px solid var(--line);margin-bottom:20px;flex-wrap:wrap}
+.logo{width:46px;height:46px;border-radius:12px;background:linear-gradient(135deg,#a78bfa,#3b82f6);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:16px}
+h1{font-size:21px;margin:0;letter-spacing:-.3px}
+.sub{color:var(--purple);font-size:13px;margin-top:2px}
+.house{color:var(--muted);font-size:12px;margin-top:2px}
+.aviso{background:rgba(245,158,11,.09);border:1px solid rgba(245,158,11,.3);border-radius:10px;padding:12px 14px;font-size:13px;color:#fcd9a0;margin-bottom:18px}
+.aviso b{color:var(--amber)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:17px 19px;margin-bottom:15px}
+.stitle{font-size:12px;font-weight:700;letter-spacing:1.1px;text-transform:uppercase;color:var(--muted);margin:0 0 13px;display:flex;align-items:center;gap:9px}
+.stitle::before{content:"";width:3px;height:15px;background:var(--purple);border-radius:2px}
+.modos{display:grid;grid-template-columns:repeat(auto-fit,minmax(185px,1fr));gap:10px;margin-bottom:16px}
+.modo{background:var(--card2);border:1px solid var(--line);border-radius:11px;padding:12px 13px;cursor:pointer;transition:.15s}
+.modo:hover{border-color:var(--blue)}
+.modo.on{border-color:var(--purple);background:rgba(167,139,250,.1)}
+.modo b{display:block;font-size:13.5px;margin-bottom:3px}
+.modo small{color:var(--muted);font-size:11.5px;line-height:1.4;display:block}
+.filtros{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:11px}
+label{display:block;font-size:10.5px;letter-spacing:.8px;text-transform:uppercase;color:var(--muted);margin-bottom:4px}
+input,select{width:100%;background:var(--card2);border:1px solid var(--line);color:var(--tx);border-radius:9px;padding:9px 11px;font-size:13.5px;outline:none}
+input:focus,select:focus{border-color:var(--blue)}
+.acciones{display:flex;gap:9px;flex-wrap:wrap;align-items:center;margin-top:15px}
+.btn{background:var(--purple);border:0;color:#0a0f1c;border-radius:9px;padding:10px 19px;font-size:14px;font-weight:700;cursor:pointer}
+.btn:hover{filter:brightness(1.1)}
+.btn.ghost{background:transparent;border:1px solid var(--line);color:var(--tx);font-weight:600}
+.btn.ghost:hover{border-color:var(--blue)}
+.err{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.35);color:#ffb4b4;border-radius:10px;padding:12px 14px;margin:14px 0;display:none}
+.loader{display:none;align-items:center;gap:11px;color:var(--muted);margin:22px 0;font-size:14px}
+.spin{width:19px;height:19px;border:2.5px solid var(--line);border-top-color:var(--purple);border-radius:50%;animation:sp .8s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+.resumen{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:11px;margin-bottom:15px}
+.kpi{background:var(--card2);border:1px solid var(--line);border-radius:11px;padding:12px 13px}
+.kpi .k{font-size:10.5px;letter-spacing:.9px;text-transform:uppercase;color:var(--muted)}
+.kpi .v{font-size:20px;font-weight:700;margin-top:5px;letter-spacing:-.3px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;color:var(--muted);font-size:10.5px;letter-spacing:.7px;text-transform:uppercase;padding:9px 8px;border-bottom:1px solid var(--line);white-space:nowrap;cursor:pointer;user-select:none}
+th:hover{color:var(--blue2)}
+td{padding:9px 8px;border-bottom:1px solid rgba(34,48,79,.55)}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+tbody tr:hover{background:rgba(59,130,246,.06)}
+.pill{display:inline-block;padding:2px 8px;border-radius:99px;font-size:11px;font-weight:700}
+.p90{background:rgba(16,185,129,.18);color:var(--green2)}
+.p70{background:rgba(59,130,246,.18);color:var(--blue2)}
+.p50{background:rgba(245,158,11,.18);color:var(--amber)}
+.p0{background:rgba(239,68,68,.16);color:#ff8085}
+.cat{color:var(--muted);font-size:11.5px}
+.foot{color:var(--muted);font-size:12px;margin-top:12px;line-height:1.6}
+.vacio{text-align:center;color:var(--muted);padding:34px 10px;font-size:14px}
+footer{text-align:center;color:var(--muted);font-size:12px;margin-top:30px;padding-top:18px;border-top:1px solid var(--line)}
+@media(max-width:800px){.tablewrap{overflow-x:auto}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="logo">CTB</div>
+  <div style="flex:1;min-width:200px">
+    <h1>Crypto Ten Bagger Hunter</h1>
+    <div class="sub">Buscador de protocolos con ingresos reales y potencial de compounder</div>
+    <div class="house">Descalzi Finanzas · Hunter encuentra · Crypto Moat Scanner valida calidad</div>
+  </div>
+</header>
+
+<div class="aviso">
+  <b>Aviso profesional.</b> Herramienta educativa. No es recomendación de inversión ni asesoramiento financiero.
+  Los criptoactivos son de altísimo riesgo y podés perder todo el capital. Un puntaje alto no implica retornos positivos.
+</div>
+
+<div class="card">
+  <div class="stitle">Modos de descubrimiento</div>
+  <div class="modos" id="modos"></div>
+
+  <div class="stitle" style="margin-top:6px">Filtros</div>
+  <div class="filtros">
+    <div><label>Tipo</label><select id="fTipo"><option value="">Todo</option><option value="protocolo">Protocolos</option><option value="cadena">Cadenas (L1/L2)</option></select></div>
+    <div><label>Categoría</label><select id="fCat"><option value="">Todas</option></select></div>
+    <div><label>Market cap mín (USD)</label><input id="fMcMin" type="number" value="20000000"></div>
+    <div><label>Market cap máx (USD)</label><input id="fMcMax" type="number" value="50000000000"></div>
+    <div><label>Fees 12m mín (USD)</label><input id="fFees" type="number" value="5000000"></div>
+    <div><label>Take rate mín</label><input id="fTake" type="number" step="0.01" value="0" placeholder="0.20 = 20%"></div>
+    <div><label>Crecimiento mín</label><input id="fCrec" type="number" step="0.05" value="-1" placeholder="0.20 = 20%"></div>
+    <div><label>Dilución máx</label><input id="fDilu" type="number" step="0.1" value="3" placeholder="1 = 100%"></div>
+    <div><label>P/Fees máx</label><input id="fPF" type="number" step="1" value="" placeholder="opcional"></div>
+    <div><label>Yield al holder mín</label><input id="fYield" type="number" step="0.01" value="0" placeholder="0.03 = 3%"></div>
+    <div><label>Exigir token listado</label><select id="fToken"><option value="si">Sí</option><option value="no">No</option></select></div>
+    <div><label>Resultados</label><select id="fLimit"><option>25</option><option selected>50</option><option>100</option><option>250</option></select></div>
+  </div>
+
+  <div class="acciones">
+    <button class="btn" onclick="rastrear()">Rastrear</button>
+    <button class="btn ghost" onclick="reset()">Limpiar filtros</button>
+    <button class="btn ghost" onclick="exportarCSV()">Descargar CSV</button>
+    <span class="foot" id="estado" style="margin:0"></span>
+  </div>
+</div>
+
+<div class="err" id="err"></div>
+<div class="loader" id="load"><div class="spin"></div><span>Cargando el universo de activos…</span></div>
+
+<div id="out"></div>
+
+<footer>Crypto Ten Bagger Hunter · Descalzi Finanzas · Fees, revenue y TVL de DefiLlama · Precio y supply de CoinGecko · Solo con fines educativos</footer>
+</div>
+
+<script>
+/* URL del Crypto Moat Scanner. Si la completás, cada fila enlaza a su ficha. */
+const URL_SCANNER = "";
+
+const PESOS = {traccion:.25, rentabilidad:.20, crecimiento:.15, tokenomics:.15, valuacion:.15, riesgo:.10};
+const MODOS = [
+  {id:"cash",  n:"Cash Cows", d:"Retienen mucho de lo que cobran y cotizan barato contra sus fees",
+   f:{fFees:20000000, fTake:0.25, fDilu:1, fPF:12, fCrec:-0.3, fYield:0.01}},
+  {id:"emerg", n:"Emergentes", d:"Chicos, creciendo fuerte, todavía sin capitalización grande",
+   f:{fMcMin:10000000, fMcMax:2000000000, fFees:5000000, fCrec:0.30, fDilu:2}},
+  {id:"blue",  n:"Blue Chips", d:"Líderes de su categoría con ingresos grandes y consolidados",
+   f:{fMcMin:1000000000, fFees:100000000, fTake:0.05, fDilu:0.5, fCrec:-0.4}},
+  {id:"valor", n:"Valor", d:"Cotizan por debajo de la mediana de su categoría",
+   f:{fFees:10000000, fPF:6, fDilu:1, fCrec:-0.4}},
+  {id:"chain", n:"Cadenas", d:"Solo L1 y L2, comparadas entre sí",
+   f:{fTipo:"cadena", fFees:1000000, fMcMin:0, fMcMax:1000000000000, fDilu:5, fCrec:-1}},
+  {id:"custom",n:"Personalizado", d:"Los filtros que pongas vos", f:{}}
+];
+let modoActivo="cash", UNIVERSO=null, RESULT=[], orden={col:"score",dir:-1};
+
+/* ===================== FORMATO ===================== */
+const nf=(v,d=0)=>v===null||v===undefined||isNaN(v)?"N/D":Number(v).toLocaleString("es-AR",{maximumFractionDigits:d,minimumFractionDigits:d});
+function usd(v){ if(v===null||v===undefined||isNaN(v)) return "N/D"; const a=Math.abs(v);
+  if(a>=1e9) return "USD "+nf(v/1e9,2)+" MM"; if(a>=1e6) return "USD "+nf(v/1e6,1)+" M";
+  if(a>=1e3) return "USD "+nf(v,0); return "USD "+nf(v,2); }
+const pct=(v,d=1)=>v===null||v===undefined||isNaN(v)?"N/D":nf(v*100,d)+"%";
+const mult=v=>v===null||v===undefined||isNaN(v)?"N/D":nf(v,1)+"x";
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const clamp=(x,a,b)=>Math.min(Math.max(x,a),b);
+function escalaLog(v,min,max){ if(!v||v<=0) return 0;
+  const l=Math.log10(v),lo=Math.log10(min),hi=Math.log10(max); return clamp((l-lo)/(hi-lo),0,1)*100; }
+
+/* ===================== SCORING (el mismo del Scanner) ===================== */
+function calcularScore(a){
+  const s={};
+  let tr=escalaLog(a.fees1y,1e6,1e9);
+  if(a.rev1y>0) tr=tr*0.75+escalaLog(a.rev1y,2e5,3e8)*0.25; else tr=Math.min(tr,40);
+  s.traccion=clamp(tr,0,100);
+
+  let re=0;
+  if(a.takeRate!==null) re+=clamp(a.takeRate/0.5,0,1)*45;
+  if(a.revTvl!==null) re+=clamp(a.revTvl/0.05,0,1)*25;
+  if(a.holdersYield!==null) re+=clamp(a.holdersYield/0.10,0,1)*30;
+  s.rentabilidad=clamp(re,0,100);
+
+  let cr=50;
+  if(a.growthImplied!==null) cr=clamp(50+a.growthImplied*100,0,100);
+  if(a.growth30!==null) cr=cr*0.7+clamp(50+a.growth30*80,0,100)*0.3;
+  s.crecimiento=cr;
+
+  let tk=50;
+  if(a.dilucion!==null) tk=clamp(100-a.dilucion*70,0,100);
+  if(a.circPct!==null) tk=tk*0.7+clamp(a.circPct*100,0,100)*0.3;
+  if(a.hold1y>0) tk=Math.min(100,tk+10);
+  if(!a.mcap) tk=35;
+  s.tokenomics=tk;
+
+  let vl=50;
+  if(a.pf!==null&&a.catPF) vl=clamp(100-(a.pf/a.catPF)*45,0,100);
+  else if(a.pf!==null) vl=clamp(100-a.pf*2,0,100);
+  if(a.ps!==null&&a.catPS) vl=vl*0.65+clamp(100-(a.ps/a.catPS)*45,0,100)*0.35;
+  if(!a.mcap) vl=50;
+  s.valuacion=vl;
+
+  let rg=50;
+  if(a.liquidez!==null) rg=clamp(a.liquidez/0.12,0,1)*35+30;
+  if(a.nChains) rg+=clamp(a.nChains/8,0,1)*15;
+  if(a.cuotaCategoria!==null) rg+=clamp(a.cuotaCategoria/0.3,0,1)*20;
+  if(a.athChange!==null&&a.athChange<-85) rg-=15;
+  s.riesgo=clamp(rg,0,100);
+
+  return Math.round(Object.keys(PESOS).reduce((t,k)=>t+s[k]*PESOS[k],0));
+}
+
+/* ===================== UNIVERSO ===================== */
+async function cargarUniverso(){
+  if(UNIVERSO) return UNIVERSO;
+  const r=await fetch("/api/universe");
+  if(!r.ok){ const j=await r.json().catch(()=>({})); throw new Error(j.error||("El servidor respondió "+r.status)); }
+  UNIVERSO=await r.json();
+  const cats=[...new Set(UNIVERSO.activos.map(a=>a.category).filter(Boolean))].sort();
+  document.getElementById("fCat").innerHTML='<option value="">Todas</option>'+cats.map(c=>`<option>${esc(c)}</option>`).join("");
+  return UNIVERSO;
+}
+
+/* ===================== MODOS Y FILTROS ===================== */
+function pintarModos(){
+  document.getElementById("modos").innerHTML=MODOS.map(m=>
+    `<div class="modo ${m.id===modoActivo?"on":""}" onclick="aplicarModo('${m.id}')"><b>${m.n}</b><small>${m.d}</small></div>`).join("");
+}
+function aplicarModo(id){
+  modoActivo=id; pintarModos();
+  const m=MODOS.find(x=>x.id===id);
+  if(id!=="custom"){ reset(true); Object.keys(m.f).forEach(k=>{ const el=document.getElementById(k); if(el) el.value=m.f[k]; }); }
+  rastrear();
+}
+function reset(silencioso){
+  const d={fTipo:"",fCat:"",fMcMin:20000000,fMcMax:50000000000,fFees:5000000,fTake:0,fCrec:-1,fDilu:3,fPF:"",fYield:0,fToken:"si",fLimit:"50"};
+  Object.keys(d).forEach(k=>{const el=document.getElementById(k); if(el) el.value=d[k];});
+  if(!silencioso){ modoActivo="custom"; pintarModos(); }
+}
+function leerFiltros(){
+  const n=id=>{const v=parseFloat(document.getElementById(id).value); return isNaN(v)?null:v;};
+  return {tipo:document.getElementById("fTipo").value, cat:document.getElementById("fCat").value,
+    mcMin:n("fMcMin"), mcMax:n("fMcMax"), fees:n("fFees"), take:n("fTake"), crec:n("fCrec"),
+    dilu:n("fDilu"), pf:n("fPF"), yld:n("fYield"),
+    token:document.getElementById("fToken").value==="si", limit:parseInt(document.getElementById("fLimit").value)||50};
+}
+function motivoDescarte(a,f){
+  if(f.token && !a.mcap) return "Sin token listado";
+  if(f.tipo && a.tipo!==f.tipo) return "Otro tipo";
+  if(f.cat && a.category!==f.cat) return "Otra categoría";
+  if(f.fees!==null && a.fees1y<f.fees) return "Fees por debajo del mínimo";
+  if(a.mcap!==null){
+    if(f.mcMin!==null && a.mcap<f.mcMin) return "Market cap chico";
+    if(f.mcMax!==null && a.mcap>f.mcMax) return "Market cap grande";
+  }
+  if(f.take!==null && f.take>0 && (a.takeRate===null || a.takeRate<f.take)) return "Take rate bajo";
+  if(f.crec!==null && f.crec>-1 && (a.growthImplied===null || a.growthImplied<f.crec)) return "Crecimiento bajo";
+  if(f.dilu!==null && a.dilucion!==null && a.dilucion>f.dilu) return "Dilución alta";
+  if(f.pf!==null && f.pf>0 && (a.pf===null || a.pf>f.pf)) return "Múltiplo alto";
+  if(f.yld!==null && f.yld>0 && (a.holdersYield===null || a.holdersYield<f.yld)) return "Yield bajo";
+  return null;
+}
+
+/* ===================== RASTREO ===================== */
+async function rastrear(){
+  const err=document.getElementById("err"), load=document.getElementById("load");
+  err.style.display="none"; load.style.display="flex";
+  try{
+    const u=await cargarUniverso();
+    const f=leerFiltros();
+    const cand=[], desc={};
+    u.activos.forEach(a=>{
+      const m=motivoDescarte(a,f);
+      if(m){ desc[m]=(desc[m]||0)+1; return; }
+      cand.push({...a, score:calcularScore(a)});
+    });
+    cand.sort((x,y)=>y.score-x.score);
+    RESULT=cand.slice(0,f.limit);
+    orden={col:"score",dir:-1};
+    pintar(cand.length, desc, u.activos.length);
+  }catch(e){ err.textContent=e.message; err.style.display="block"; document.getElementById("out").innerHTML=""; }
+  finally{ load.style.display="none"; }
+}
+
+function pillClase(s){ return s>=75?"p90":s>=60?"p70":s>=45?"p50":"p0"; }
+
+function pintar(nCand, desc, nTotal){
+  const out=document.getElementById("out");
+  document.getElementById("estado").textContent =
+    `${nCand} candidatas de ${nTotal} activos · datos al ${new Date(UNIVERSO.fetchedAt).toLocaleString("es-AR")}`;
+  if(!RESULT.length){
+    const top=Object.entries(desc).sort((a,b)=>b[1]-a[1]).slice(0,4).map(([k,v])=>`${k} (${v})`).join(" · ");
+    out.innerHTML=`<div class="card"><div class="vacio">Ningún activo pasó los filtros.<br>
+      <span style="font-size:12.5px">Motivos principales de descarte: ${top||"—"}</span></div></div>`;
+    return;
+  }
+  const r=RESULT;
+  const medianaPF = (()=>{const s=r.map(x=>x.pf).filter(v=>v>0).sort((a,b)=>a-b); return s.length?s[Math.floor(s.length/2)]:null;})();
+  out.innerHTML = `
+  <div class="resumen">
+    <div class="kpi"><div class="k">Candidatas</div><div class="v">${r.length}</div></div>
+    <div class="kpi"><div class="k">Puntaje medio</div><div class="v">${nf(r.reduce((s,x)=>s+x.score,0)/r.length,0)}</div></div>
+    <div class="kpi"><div class="k">Fees 12m sumados</div><div class="v">${usd(r.reduce((s,x)=>s+(x.fees1y||0),0))}</div></div>
+    <div class="kpi"><div class="k">P/Fees mediana</div><div class="v">${mult(medianaPF)}</div></div>
+  </div>
+  <div class="card">
+    <div class="stitle">Ranking</div>
+    <div class="tablewrap"><table id="tabla">
+      <thead><tr>
+        <th onclick="ordenar('score')">#</th>
+        <th onclick="ordenar('name')">Activo</th>
+        <th onclick="ordenar('score')" class="num">Puntaje</th>
+        <th onclick="ordenar('fees1y')" class="num">Fees 12m</th>
+        <th onclick="ordenar('rev1y')" class="num">Revenue</th>
+        <th onclick="ordenar('takeRate')" class="num">Take</th>
+        <th onclick="ordenar('mcap')" class="num">Market cap</th>
+        <th onclick="ordenar('pf')" class="num">P/Fees</th>
+        <th onclick="ordenar('holdersYield')" class="num">Yield</th>
+        <th onclick="ordenar('dilucion')" class="num">Dilución</th>
+        <th onclick="ordenar('growthImplied')" class="num">Crec.</th>
+        <th onclick="ordenar('tvl')" class="num">TVL</th>
+      </tr></thead>
+      <tbody>${filas()}</tbody>
+    </table></div>
+    <div class="foot">
+      Tocá cualquier encabezado para reordenar. <b>Take</b> es cuánto del fee retiene el protocolo;
+      <b>P/Fees</b>, la capitalización sobre los fees de 12 meses; <b>Yield</b>, lo que el protocolo reparte
+      a los holders sobre la capitalización; <b>Dilución</b>, el supply pendiente de emitir medido contra la
+      capitalización actual; <b>Crec.</b>, el ritmo del último mes contra el promedio anual.
+      ${URL_SCANNER?"":"<br>Para ver la ficha completa de un activo, abrilo en el Crypto Moat Scanner."}
+    </div>
+  </div>`;
+}
+function filas(){
+  return RESULT.map((a,i)=>{
+    const nombre = URL_SCANNER
+      ? `<a href="${URL_SCANNER}?q=${encodeURIComponent(a.key)}" target="_blank" style="color:var(--blue2);text-decoration:none">${esc(a.name)}</a>`
+      : esc(a.name);
+    return `<tr>
+      <td class="num" style="color:var(--muted)">${i+1}</td>
+      <td><b>${nombre}</b> ${a.symbol?`<span style="color:var(--muted)">· ${esc(a.symbol)}</span>`:""}
+        <div class="cat">${esc(a.category||"—")} · ${a.tipo}</div></td>
+      <td class="num"><span class="pill ${pillClase(a.score)}">${a.score}</span></td>
+      <td class="num">${usd(a.fees1y)}</td>
+      <td class="num">${usd(a.rev1y)}</td>
+      <td class="num">${pct(a.takeRate)}</td>
+      <td class="num">${usd(a.mcap)}</td>
+      <td class="num">${mult(a.pf)}</td>
+      <td class="num">${pct(a.holdersYield,2)}</td>
+      <td class="num" style="color:${a.dilucion===null?"":(a.dilucion<0.25?"var(--green2)":a.dilucion<1?"var(--amber)":"#ff8085")}">${pct(a.dilucion)}</td>
+      <td class="num" style="color:${a.growthImplied===null?"":(a.growthImplied>=0?"var(--green2)":"#ff8085")}">${a.growthImplied!==null?(a.growthImplied>=0?"+":"")+pct(a.growthImplied):"N/D"}</td>
+      <td class="num">${usd(a.tvl)}</td>
+    </tr>`;
+  }).join("");
+}
+function ordenar(col){
+  orden.dir = (orden.col===col) ? -orden.dir : -1;
+  orden.col = col;
+  const desc = orden.dir === -1;   // -1 = de mayor a menor
+  RESULT.sort((x,y)=>{
+    const a=x[col], b=y[col];
+    if(typeof a==="string"||typeof b==="string"){
+      const cmp=String(a??"").localeCompare(String(b??""));
+      return desc ? -cmp : cmp;
+    }
+    const av=(a===null||a===undefined||isNaN(a))?-Infinity:a;
+    const bv=(b===null||b===undefined||isNaN(b))?-Infinity:b;
+    return desc ? bv-av : av-bv;
+  });
+  document.querySelector("#tabla tbody").innerHTML=filas();
+}
+function exportarCSV(){
+  if(!RESULT.length){ const e=document.getElementById("err"); e.textContent="Primero corré un rastreo."; e.style.display="block"; return; }
+  const cols=["name","symbol","category","tipo","score","fees1y","rev1y","hold1y","takeRate","tvl","mcap","fdv","pf","ps","holdersYield","dilucion","growthImplied","nChains"];
+  const cab=["Activo","Símbolo","Categoría","Tipo","Puntaje","Fees 12m","Revenue 12m","A holders","Take rate","TVL","Market cap","FDV","P/Fees","P/Revenue","Yield","Dilución","Crecimiento","Cadenas"];
+  const filas=RESULT.map(a=>cols.map(c=>{const v=a[c]; return v===null||v===undefined?"":(typeof v==="string"?`"${v.replace(/"/g,'""')}"`:v);}).join(","));
+  const csv=[cab.join(","),...filas].join("\n");
+  const b=new Blob(["﻿"+csv],{type:"text/csv;charset=utf-8"});
+  const u=URL.createObjectURL(b), a=document.createElement("a");
+  a.href=u; a.download=`crypto-hunter-${new Date().toISOString().slice(0,10)}.csv`; a.click();
+  setTimeout(()=>URL.revokeObjectURL(u),1500);
+}
+
+pintarModos();
+aplicarModo("cash");
+</script>
+</body>
+</html>

@@ -1,0 +1,7 @@
+{
+  "name": "crypto-hunter",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Crypto hunter - Descalzi Finanzas. Backend serverless sobre DefiLlama y CoinGecko.",
+  "engines": { "node": ">=18" }
+}
