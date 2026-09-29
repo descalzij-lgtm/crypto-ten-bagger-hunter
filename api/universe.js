@@ -13,7 +13,6 @@
    ============================================================ */
 
 const LLAMA = "https://api.llama.fi";
-const CG = "https://api.coingecko.com/api/v3";
 const Q = "excludeTotalDataChart=true&excludeTotalDataChartBreakdown=true";
 
 const TOP_N = 400;        // cuántos activos se enriquecen con datos de mercado
@@ -65,15 +64,30 @@ function foldOverview(json, target, field) {
   });
 }
 
-async function getJson(url, headers) {
-  const r = await fetch(url, headers ? { headers } : undefined);
-  if (!r.ok) throw new Error(url.split("?")[0] + " → " + r.status);
-  return r.json();
+/* Reintenta ante 429/5xx: sin API key, CoinGecko limita por IP y las IPs
+   compartidas de Vercel suelen llegar ya "gastadas". */
+async function getJson(url, headers, intentos = 2) {
+  for (let i = 0; i < intentos; i++) {
+    const r = await fetch(url, headers ? { headers } : undefined);
+    if (r.ok) return r.json();
+    if ((r.status === 429 || r.status >= 500) && i < intentos - 1) {
+      await new Promise((ok) => setTimeout(ok, 2000 * (i + 1) ** 2));
+      continue;
+    }
+    throw new Error(url.split("?")[0] + " → " + r.status);
+  }
 }
 
 async function buildUniverse() {
-  const cgHeaders = process.env.COINGECKO_API_KEY
-    ? { "x-cg-demo-api-key": process.env.COINGECKO_API_KEY } : null;
+  /* La key puede ser de plan pago (Pro/Analyst → pro-api + x-cg-pro-api-key)
+     o Demo gratis (api + x-cg-demo-api-key). Se detecta sola. */
+  const KEY = (process.env.COINGECKO_API_KEY || "").trim();
+  let CG = "https://api.coingecko.com/api/v3", cgHeaders = null;
+  if (KEY) {
+    const pro = await fetch("https://pro-api.coingecko.com/api/v3/ping", { headers: { "x-cg-pro-api-key": KEY } }).catch(() => null);
+    if (pro && pro.ok) { CG = "https://pro-api.coingecko.com/api/v3"; cgHeaders = { "x-cg-pro-api-key": KEY }; }
+    else cgHeaders = { "x-cg-demo-api-key": KEY };
+  }
 
   const [fees, rev, hold, protocols, chains, cgList] = await Promise.all([
     getJson(`${LLAMA}/overview/fees?${Q}&dataType=dailyFees`),
@@ -160,11 +174,13 @@ async function buildUniverse() {
     r.geckoCandidatos = [...new Set(cands)];
   });
 
-  /* Datos de mercado de CoinGecko para los más relevantes, en tandas de 250 */
+  /* Datos de mercado de CoinGecko, en tandas de 100: desde sep-2026 CoinGecko
+     rechaza consultas con más ids (con 150 ya falla, verificado 29/09/2026). */
+  const TANDA = 100;
   const ids = [...new Set(rows.slice(0, TOP_N).flatMap((r) => r.geckoCandidatos || []))];
   const market = {};
-  for (let i = 0; i < ids.length; i += 250) {
-    const batch = ids.slice(i, i + 250).join(",");
+  for (let i = 0; i < ids.length; i += TANDA) {
+    const batch = ids.slice(i, i + TANDA).join(",");
     try {
       const list = await getJson(
         `${CG}/coins/markets?vs_currency=usd&ids=${encodeURIComponent(batch)}&order=market_cap_desc&per_page=250&page=1&sparkline=false&price_change_percentage=30d,1y`,
@@ -172,7 +188,9 @@ async function buildUniverse() {
       );
       (list || []).forEach((c) => { market[c.id] = c; });
     } catch (e) { /* si CoinGecko falla, el universo igual sirve sin datos de mercado */ }
+    if (i + TANDA < ids.length) await new Promise((ok) => setTimeout(ok, 500));
   }
+  const mercadoOk = Object.keys(market).length > 0;
 
   rows.forEach((r) => {
     /* Entre los candidatos se queda el de mayor market cap: resuelve los
@@ -247,7 +265,12 @@ async function buildUniverse() {
     }
   });
 
-  return { fetchedAt: new Date().toISOString(), fuente: "DefiLlama + CoinGecko", categorias: cats, activos: rows };
+  return {
+    fetchedAt: new Date().toISOString(), fuente: "DefiLlama + CoinGecko",
+    mercadoOk,
+    aviso: mercadoOk ? null : "CoinGecko no respondió (límite de llamadas). Faltan precio y market cap; reintentá en unos minutos.",
+    categorias: cats, activos: rows,
+  };
 }
 
 let cache = null, cacheAt = 0;
@@ -260,11 +283,16 @@ module.exports = async function handler(req, res) {
 
   try {
     const ahora = Date.now();
-    if (!cache || ahora - cacheAt > 30 * 60 * 1000) {
+    /* Un universo sin datos de mercado no se guarda: se reintenta en 2 minutos
+       en vez de dejar la herramienta vacía durante media hora. */
+    const ttl = cache && cache.mercadoOk === false ? 2 * 60 * 1000 : 30 * 60 * 1000;
+    if (!cache || ahora - cacheAt > ttl) {
       cache = await buildUniverse();
       cacheAt = ahora;
     }
-    res.setHeader("Cache-Control", "s-maxage=1800, stale-while-revalidate=86400");
+    res.setHeader("Cache-Control", cache.mercadoOk === false
+      ? "no-store"
+      : "s-maxage=1800, stale-while-revalidate=86400");
 
     const id = String(req.query.id || "").trim().toLowerCase();
     if (id) {
